@@ -111,11 +111,35 @@ def scrape():
 					UPDATE books
 					SET isbndb_scraped = 1 
 					WHERE b_id=? ''' , (book13[0],))
+		conn.commit()
 		
 	for book10 in book_10s:
-		print(book10)
-	
-	conn.commit()
+		print(book10[1])
+		c.execute('INSERT OR IGNORE INTO isbndb_books (b_id) VALUES (?)', (book10[0],))
+		r = requests.get(BOOK_STRING + book10[1])
+		json = r.json()
+		if 'error' in json.keys():
+			print("Book with ISBN13 " + book10[1] + " was not found in the ISBNDB database")
+			c.execute('''
+				UPDATE books
+				SET isbndb_scraped = 0 
+				WHERE b_id=? ''' , (book10[0],))
+			continue
+		for key in json['data'][0]:
+			if (key in ISBN_DB_API_2_DATA_SINGLE_KEYS):
+				c.execute('''
+					UPDATE isbndb_books 
+					SET ''' + ISBN_DB_TO_LIBRERY_DB_CONVERSION_TABLE[key] + '''=? 
+					WHERE b_id =? ''' , (json['data'][0][key], book10[0]))
+			else:
+				print("Unhandled key for book with ISBN10 " + book10[1] + " '" + key + "' has value '", end="")
+				print(json['data'][0][key], end="")
+				print("'")
+			c.execute('''
+					UPDATE books
+					SET isbndb_scraped = 1 
+					WHERE b_id=? ''' , (book10[0],))
+		conn.commit()
 	'''
 		print("\tScraping feed:", fid)
 		# strip out the id (first field)
